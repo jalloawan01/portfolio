@@ -1,0 +1,850 @@
+---
+title: "Flutter Architecture Patterns: Clean Architecture, MVVM, and BLoC for Scalable Apps"
+publishedAt: "2024-09-15"
+image: "/images/gallery/img-09.jpg"
+summary: "Explore Flutter architecture patterns including Clean Architecture, MVVM, and BLoC to build maintainable and scalable mobile applications."
+tag: "Flutter"
+---
+
+Choosing the right architecture pattern is crucial for building maintainable, scalable, and testable Flutter applications. In this comprehensive guide, I'll explore popular architecture patterns and show you how to implement them effectively in your Flutter projects.
+
+## Why Architecture Matters
+
+Good architecture provides:
+- **Separation of Concerns**: Clear boundaries between different layers
+- **Testability**: Easy to write unit and integration tests
+- **Maintainability**: Code is easier to understand and modify
+- **Scalability**: Easy to add new features and team members
+- **Reusability**: Components can be reused across the app
+
+## 1. Clean Architecture
+
+Clean Architecture separates your app into layers with clear dependencies and responsibilities.
+
+### Project Structure
+
+```
+lib/
+├── core/
+│   ├── error/
+│   ├── network/
+│   └── usecases/
+├── features/
+│   └── user/
+│       ├── data/
+│       │   ├── datasources/
+│       │   ├── models/
+│       │   └── repositories/
+│       ├── domain/
+│       │   ├── entities/
+│       │   ├── repositories/
+│       │   └── usecases/
+│       └── presentation/
+│           ├── bloc/
+│           ├── pages/
+│           └── widgets/
+└── shared/
+    ├── widgets/
+    └── utils/
+```
+
+### Domain Layer (Entities and Use Cases)
+
+```dart
+// lib/features/user/domain/entities/user.dart
+class User {
+  final String id;
+  final String name;
+  final String email;
+  
+  const User({
+    required this.id,
+    required this.name,
+    required this.email,
+  });
+}
+
+// lib/features/user/domain/repositories/user_repository.dart
+abstract class UserRepository {
+  Future<User> getUser(String id);
+  Future<List<User>> getUsers();
+  Future<void> createUser(User user);
+  Future<void> updateUser(User user);
+  Future<void> deleteUser(String id);
+}
+
+// lib/features/user/domain/usecases/get_user.dart
+class GetUser {
+  final UserRepository repository;
+  
+  GetUser(this.repository);
+  
+  Future<Either<Failure, User>> call(String id) async {
+    try {
+      final user = await repository.getUser(id);
+      return Right(user);
+    } catch (e) {
+      return Left(ServerFailure());
+    }
+  }
+}
+```
+
+### Data Layer (Models and Data Sources)
+
+```dart
+// lib/features/user/data/models/user_model.dart
+class UserModel extends User {
+  const UserModel({
+    required String id,
+    required String name,
+    required String email,
+  }) : super(id: id, name: name, email: email);
+  
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'],
+      name: json['name'],
+      email: json['email'],
+    );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+    };
+  }
+}
+
+// lib/features/user/data/datasources/user_remote_datasource.dart
+abstract class UserRemoteDataSource {
+  Future<UserModel> getUser(String id);
+  Future<List<UserModel>> getUsers();
+  Future<void> createUser(UserModel user);
+  Future<void> updateUser(UserModel user);
+  Future<void> deleteUser(String id);
+}
+
+class UserRemoteDataSourceImpl implements UserRemoteDataSource {
+  final http.Client client;
+  
+  UserRemoteDataSourceImpl({required this.client});
+  
+  @override
+  Future<UserModel> getUser(String id) async {
+    final response = await client.get(
+      Uri.parse('https://api.example.com/users/$id'),
+    );
+    
+    if (response.statusCode == 200) {
+      return UserModel.fromJson(json.decode(response.body));
+    } else {
+      throw ServerException();
+    }
+  }
+  
+  // Implement other methods...
+}
+
+// lib/features/user/data/repositories/user_repository_impl.dart
+class UserRepositoryImpl implements UserRepository {
+  final UserRemoteDataSource remoteDataSource;
+  final UserLocalDataSource localDataSource;
+  final NetworkInfo networkInfo;
+  
+  UserRepositoryImpl({
+    required this.remoteDataSource,
+    required this.localDataSource,
+    required this.networkInfo,
+  });
+  
+  @override
+  Future<User> getUser(String id) async {
+    if (await networkInfo.isConnected) {
+      try {
+        final userModel = await remoteDataSource.getUser(id);
+        await localDataSource.cacheUser(userModel);
+        return userModel;
+      } catch (e) {
+        throw ServerException();
+      }
+    } else {
+      try {
+        final userModel = await localDataSource.getUser(id);
+        return userModel;
+      } catch (e) {
+        throw CacheException();
+      }
+    }
+  }
+  
+  // Implement other methods...
+}
+```
+
+### Presentation Layer (BLoC)
+
+```dart
+// lib/features/user/presentation/bloc/user_bloc.dart
+class UserBloc extends Bloc<UserEvent, UserState> {
+  final GetUser getUser;
+  final GetUsers getUsers;
+  final CreateUser createUser;
+  final UpdateUser updateUser;
+  final DeleteUser deleteUser;
+  
+  UserBloc({
+    required this.getUser,
+    required this.getUsers,
+    required this.createUser,
+    required this.updateUser,
+    required this.deleteUser,
+  }) : super(UserInitial()) {
+    on<GetUserEvent>(_onGetUser);
+    on<GetUsersEvent>(_onGetUsers);
+    on<CreateUserEvent>(_onCreateUser);
+    on<UpdateUserEvent>(_onUpdateUser);
+    on<DeleteUserEvent>(_onDeleteUser);
+  }
+  
+  Future<void> _onGetUser(GetUserEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await getUser(event.id);
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (user) => emit(UserLoaded(user)),
+    );
+  }
+  
+  Future<void> _onGetUsers(GetUsersEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await getUsers();
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (users) => emit(UsersLoaded(users)),
+    );
+  }
+  
+  // Implement other event handlers...
+}
+
+// lib/features/user/presentation/bloc/user_event.dart
+abstract class UserEvent extends Equatable {
+  const UserEvent();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class GetUserEvent extends UserEvent {
+  final String id;
+  
+  const GetUserEvent(this.id);
+  
+  @override
+  List<Object> get props => [id];
+}
+
+class GetUsersEvent extends UserEvent {}
+
+// lib/features/user/presentation/bloc/user_state.dart
+abstract class UserState extends Equatable {
+  const UserState();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class UserInitial extends UserState {}
+
+class UserLoading extends UserState {}
+
+class UserLoaded extends UserState {
+  final User user;
+  
+  const UserLoaded(this.user);
+  
+  @override
+  List<Object> get props => [user];
+}
+
+class UsersLoaded extends UserState {
+  final List<User> users;
+  
+  const UsersLoaded(this.users);
+  
+  @override
+  List<Object> get props => [users];
+}
+
+class UserError extends UserState {
+  final String message;
+  
+  const UserError(this.message);
+  
+  @override
+  List<Object> get props => [message];
+}
+```
+
+## 2. MVVM (Model-View-ViewModel)
+
+MVVM separates the UI (View) from the business logic (ViewModel) and data (Model).
+
+### ViewModel Implementation
+
+```dart
+// lib/features/user/presentation/viewmodels/user_viewmodel.dart
+class UserViewModel extends ChangeNotifier {
+  final GetUser getUser;
+  final GetUsers getUsers;
+  final CreateUser createUser;
+  final UpdateUser updateUser;
+  final DeleteUser deleteUser;
+  
+  UserViewModel({
+    required this.getUser,
+    required this.getUsers,
+    required this.createUser,
+    required this.updateUser,
+    required this.deleteUser,
+  });
+  
+  User? _user;
+  List<User> _users = [];
+  bool _isLoading = false;
+  String? _error;
+  
+  User? get user => _user;
+  List<User> get users => _users;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  
+  Future<void> loadUser(String id) async {
+    _setLoading(true);
+    _setError(null);
+    
+    final result = await getUser(id);
+    
+    result.fold(
+      (failure) => _setError(failure.message),
+      (user) => _setUser(user),
+    );
+    
+    _setLoading(false);
+  }
+  
+  Future<void> loadUsers() async {
+    _setLoading(true);
+    _setError(null);
+    
+    final result = await getUsers();
+    
+    result.fold(
+      (failure) => _setError(failure.message),
+      (users) => _setUsers(users),
+    );
+    
+    _setLoading(false);
+  }
+  
+  Future<void> createNewUser(User user) async {
+    _setLoading(true);
+    _setError(null);
+    
+    final result = await createUser(user);
+    
+    result.fold(
+      (failure) => _setError(failure.message),
+      (_) => loadUsers(),
+    );
+    
+    _setLoading(false);
+  }
+  
+  void _setUser(User user) {
+    _user = user;
+    notifyListeners();
+  }
+  
+  void _setUsers(List<User> users) {
+    _users = users;
+    notifyListeners();
+  }
+  
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+  
+  void _setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+}
+```
+
+### View Implementation
+
+```dart
+// lib/features/user/presentation/pages/user_list_page.dart
+class UserListPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => getIt<UserViewModel>(),
+      child: Consumer<UserViewModel>(
+        builder: (context, viewModel, child) {
+          return Scaffold(
+            appBar: AppBar(title: Text('Users')),
+            body: _buildBody(context, viewModel),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () => _navigateToCreateUser(context),
+              child: Icon(Icons.add),
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  Widget _buildBody(BuildContext context, UserViewModel viewModel) {
+    if (viewModel.isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+    
+    if (viewModel.error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Error: ${viewModel.error}'),
+            ElevatedButton(
+              onPressed: () => viewModel.loadUsers(),
+              child: Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (viewModel.users.isEmpty) {
+      return Center(child: Text('No users found'));
+    }
+    
+    return ListView.builder(
+      itemCount: viewModel.users.length,
+      itemBuilder: (context, index) {
+        final user = viewModel.users[index];
+        return ListTile(
+          title: Text(user.name),
+          subtitle: Text(user.email),
+          onTap: () => _navigateToUserDetail(context, user.id),
+        );
+      },
+    );
+  }
+  
+  void _navigateToCreateUser(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => CreateUserPage()),
+    );
+  }
+  
+  void _navigateToUserDetail(BuildContext context, String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserDetailPage(userId: userId),
+      ),
+    );
+  }
+}
+```
+
+## 3. BLoC Pattern
+
+BLoC (Business Logic Component) is a state management pattern that separates business logic from UI.
+
+### BLoC Implementation
+
+```dart
+// lib/features/user/presentation/bloc/user_bloc.dart
+class UserBloc extends Bloc<UserEvent, UserState> {
+  final GetUser getUser;
+  final GetUsers getUsers;
+  final CreateUser createUser;
+  final UpdateUser updateUser;
+  final DeleteUser deleteUser;
+  
+  UserBloc({
+    required this.getUser,
+    required this.getUsers,
+    required this.createUser,
+    required this.updateUser,
+    required this.deleteUser,
+  }) : super(UserInitial()) {
+    on<GetUserEvent>(_onGetUser);
+    on<GetUsersEvent>(_onGetUsers);
+    on<CreateUserEvent>(_onCreateUser);
+    on<UpdateUserEvent>(_onUpdateUser);
+    on<DeleteUserEvent>(_onDeleteUser);
+  }
+  
+  Future<void> _onGetUser(GetUserEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await getUser(event.id);
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (user) => emit(UserLoaded(user)),
+    );
+  }
+  
+  Future<void> _onGetUsers(GetUsersEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await getUsers();
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (users) => emit(UsersLoaded(users)),
+    );
+  }
+  
+  Future<void> _onCreateUser(CreateUserEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await createUser(event.user);
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (_) => emit(UserCreated()),
+    );
+  }
+  
+  Future<void> _onUpdateUser(UpdateUserEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await updateUser(event.user);
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (_) => emit(UserUpdated()),
+    );
+  }
+  
+  Future<void> _onDeleteUser(DeleteUserEvent event, Emitter<UserState> emit) async {
+    emit(UserLoading());
+    
+    final result = await deleteUser(event.id);
+    
+    result.fold(
+      (failure) => emit(UserError(failure.message)),
+      (_) => emit(UserDeleted()),
+    );
+  }
+}
+```
+
+### BLoC Events and States
+
+```dart
+// lib/features/user/presentation/bloc/user_event.dart
+abstract class UserEvent extends Equatable {
+  const UserEvent();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class GetUserEvent extends UserEvent {
+  final String id;
+  
+  const GetUserEvent(this.id);
+  
+  @override
+  List<Object> get props => [id];
+}
+
+class GetUsersEvent extends UserEvent {}
+
+class CreateUserEvent extends UserEvent {
+  final User user;
+  
+  const CreateUserEvent(this.user);
+  
+  @override
+  List<Object> get props => [user];
+}
+
+class UpdateUserEvent extends UserEvent {
+  final User user;
+  
+  const UpdateUserEvent(this.user);
+  
+  @override
+  List<Object> get props => [user];
+}
+
+class DeleteUserEvent extends UserEvent {
+  final String id;
+  
+  const DeleteUserEvent(this.id);
+  
+  @override
+  List<Object> get props => [id];
+}
+
+// lib/features/user/presentation/bloc/user_state.dart
+abstract class UserState extends Equatable {
+  const UserState();
+  
+  @override
+  List<Object> get props => [];
+}
+
+class UserInitial extends UserState {}
+
+class UserLoading extends UserState {}
+
+class UserLoaded extends UserState {
+  final User user;
+  
+  const UserLoaded(this.user);
+  
+  @override
+  List<Object> get props => [user];
+}
+
+class UsersLoaded extends UserState {
+  final List<User> users;
+  
+  const UsersLoaded(this.users);
+  
+  @override
+  List<Object> get props => [users];
+}
+
+class UserCreated extends UserState {}
+
+class UserUpdated extends UserState {}
+
+class UserDeleted extends UserState {}
+
+class UserError extends UserState {
+  final String message;
+  
+  const UserError(this.message);
+  
+  @override
+  List<Object> get props => [message];
+}
+```
+
+### BLoC View Implementation
+
+```dart
+// lib/features/user/presentation/pages/user_list_page.dart
+class UserListPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => getIt<UserBloc>()..add(GetUsersEvent()),
+      child: Scaffold(
+        appBar: AppBar(title: Text('Users')),
+        body: BlocBuilder<UserBloc, UserState>(
+          builder: (context, state) {
+            if (state is UserLoading) {
+              return Center(child: CircularProgressIndicator());
+            }
+            
+            if (state is UserError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: ${state.message}'),
+                    ElevatedButton(
+                      onPressed: () {
+                        context.read<UserBloc>().add(GetUsersEvent());
+                      },
+                      child: Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            if (state is UsersLoaded) {
+              if (state.users.isEmpty) {
+                return Center(child: Text('No users found'));
+              }
+              
+              return ListView.builder(
+                itemCount: state.users.length,
+                itemBuilder: (context, index) {
+                  final user = state.users[index];
+                  return ListTile(
+                    title: Text(user.name),
+                    subtitle: Text(user.email),
+                    onTap: () => _navigateToUserDetail(context, user.id),
+                  );
+                },
+              );
+            }
+            
+            return Center(child: Text('Unknown state'));
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => _navigateToCreateUser(context),
+          child: Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+  
+  void _navigateToCreateUser(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => CreateUserPage()),
+    );
+  }
+  
+  void _navigateToUserDetail(BuildContext context, String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserDetailPage(userId: userId),
+      ),
+    );
+  }
+}
+```
+
+## Dependency Injection
+
+### GetIt Setup
+
+```dart
+// lib/injection_container.dart
+final getIt = GetIt.instance;
+
+Future<void> init() async {
+  // Features - User
+  // Bloc
+  getIt.registerFactory(() => UserBloc(
+    getUser: getIt(),
+    getUsers: getIt(),
+    createUser: getIt(),
+    updateUser: getIt(),
+    deleteUser: getIt(),
+  ));
+  
+  // Use cases
+  getIt.registerLazySingleton(() => GetUser(getIt()));
+  getIt.registerLazySingleton(() => GetUsers(getIt()));
+  getIt.registerLazySingleton(() => CreateUser(getIt()));
+  getIt.registerLazySingleton(() => UpdateUser(getIt()));
+  getIt.registerLazySingleton(() => DeleteUser(getIt()));
+  
+  // Repository
+  getIt.registerLazySingleton<UserRepository>(
+    () => UserRepositoryImpl(
+      remoteDataSource: getIt(),
+      localDataSource: getIt(),
+      networkInfo: getIt(),
+    ),
+  );
+  
+  // Data sources
+  getIt.registerLazySingleton<UserRemoteDataSource>(
+    () => UserRemoteDataSourceImpl(client: getIt()),
+  );
+  
+  getIt.registerLazySingleton<UserLocalDataSource>(
+    () => UserLocalDataSourceImpl(sharedPreferences: getIt()),
+  );
+  
+  // Core
+  getIt.registerLazySingleton(() => http.Client());
+  getIt.registerLazySingleton(() => SharedPreferences.getInstance());
+  getIt.registerLazySingleton<NetworkInfo>(() => NetworkInfoImpl(getIt()));
+}
+```
+
+## Testing Architecture
+
+### Unit Tests
+
+```dart
+// test/features/user/domain/usecases/get_user_test.dart
+class MockUserRepository extends Mock implements UserRepository {}
+
+void main() {
+  late GetUser usecase;
+  late MockUserRepository mockUserRepository;
+  
+  setUp(() {
+    mockUserRepository = MockUserRepository();
+    usecase = GetUser(mockUserRepository);
+  });
+  
+  group('GetUser', () {
+    const tUserId = '1';
+    const tUser = User(id: tUserId, name: 'Test User', email: 'test@example.com');
+    
+    test('should get user from repository', () async {
+      // Arrange
+      when(mockUserRepository.getUser(any))
+          .thenAnswer((_) async => tUser);
+      
+      // Act
+      final result = await usecase(tUserId);
+      
+      // Assert
+      expect(result, equals(Right(tUser)));
+      verify(mockUserRepository.getUser(tUserId));
+      verifyNoMoreInteractions(mockUserRepository);
+    });
+  });
+}
+```
+
+## Best Practices
+
+1. **Follow SOLID Principles**: Single responsibility, open/closed, Liskov substitution, interface segregation, dependency inversion
+2. **Use Dependency Injection**: Makes testing easier and code more modular
+3. **Implement Error Handling**: Use Either type for error handling
+4. **Write Tests**: Unit tests, widget tests, and integration tests
+5. **Keep Layers Separate**: Don't mix concerns between layers
+6. **Use Interfaces**: Abstract classes for better testability
+7. **Handle Loading States**: Provide feedback to users
+8. **Implement Offline Support**: Cache data for offline usage
+
+## Conclusion
+
+Choosing the right architecture pattern depends on your project's complexity, team size, and requirements. Clean Architecture provides the most separation of concerns, MVVM is simpler for smaller projects, and BLoC offers excellent state management.
+
+Remember to:
+- Start simple and evolve as needed
+- Keep layers separate and focused
+- Write comprehensive tests
+- Use dependency injection
+- Follow SOLID principles
+- Document your architecture decisions
+
+With proper architecture, your Flutter apps will be maintainable, testable, and scalable.
+
+---
+
+*What architecture patterns have you used in your Flutter projects? Share your experiences and tips in the comments!*
