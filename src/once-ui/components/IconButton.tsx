@@ -67,9 +67,15 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps | AnchorProps>(
       return () => clearTimeout(timer);
     }, [isHover]);
 
+    const iconSizeMap: Record<NonNullable<typeof size>, "s" | "m" | "l"> = {
+      s: "s",
+      m: "m",
+      l: "l",
+    };
+
     const content = (
       <>
-        {children ? children : <Icon name={icon} size="s" />}
+        {children ? children : <Icon name={icon} size={iconSizeMap[size]} />}
         {tooltip && isTooltipVisible && (
           <Flex position="absolute" zIndex={1} className={iconStyles[tooltipPosition]}>
             <Tooltip label={tooltip} />

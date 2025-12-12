@@ -36,12 +36,12 @@ const social = [
   },
   {
     name: "Upwork",
-    icon: "openLink",
+    icon: "upwork",
     link: "https://www.upwork.com/freelancers/~01caea48a0ec6cc26f",
   },
   {
     name: "Fiverr",
-    icon: "openLink",
+    icon: "fiverr",
     link: "https://www.fiverr.com/s/dDkBxqG",
   },
 ];
@@ -72,7 +72,7 @@ const about = {
   },
   calendar: {
     display: true,
-    link: "https://cal.com/engrhashim160",
+    link: "https://cal.com/jalalahmad01/30min",
   },
   intro: {
     display: true,

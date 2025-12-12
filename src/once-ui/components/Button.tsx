@@ -61,7 +61,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps | AnchorProps>(
     },
     ref,
   ) => {
-    const iconSize = size === "l" ? "s" : size === "m" ? "s" : "xs";
+    const iconSize = size === "l" ? "l" : size === "m" ? "m" : "s";
     const radiusSize = size === "s" || size === "m" ? "m" : "l";
 
     return (
