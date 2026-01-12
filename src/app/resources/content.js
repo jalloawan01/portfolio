@@ -243,6 +243,21 @@ const gallery = {
       alt: "Flutter Project",
       orientation: "horizontal"
     },
+    {
+      src: "/images/projects/project-06/1.png",
+      alt: "Nexus Store - E-commerce Platform",
+      orientation: "horizontal"
+    },
+    {
+      src: "/images/projects/project-06/2.png",
+      alt: "Nexus Store - Customer Application",
+      orientation: "horizontal"
+    },
+    {
+      src: "/images/projects/project-06/3.png",
+      alt: "Nexus Store - Admin Management",
+      orientation: "horizontal"
+    },
   ],
 };
 

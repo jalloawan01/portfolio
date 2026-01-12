@@ -1,0 +1,97 @@
+---
+title: "Nexus Store"
+publishedAt: "2024-12-15"
+summary: "A modern, scalable e-commerce platform with Flutter and Supabase, featuring a premium customer mobile app and a secure admin management system with real-time synchronization."
+images:
+  - "/images/projects/project-06/1.png"
+  - "/images/projects/project-06/2.png"
+  - "/images/projects/project-06/3.png"
+---
+
+## Overview
+
+Nexus Store is a professionally engineered e-commerce platform developed using Flutter and Supabase, designed to deliver a premium customer shopping experience alongside a secure and efficient administrative management system. The project consists of two tightly integrated applications: a Customer Mobile Application focused on usability, performance, and premium UI/UX, and an Admin Management Application focused on inventory control, category management, and operational monitoring.
+
+Both applications share a unified backend architecture, ensuring real-time data synchronization, consistency, and secure role-based access.
+
+## System Architecture
+
+- **Frontend**: Flutter (Material 3)
+- **Backend**: Supabase (PostgreSQL, Authentication, Row Level Security)
+- **Architecture Style**: Modular, scalable, and role-based
+- **Data Flow**: Single source of truth with real-time sync between admin and customer applications
+
+## Customer Application Features
+
+The Nexus Store Customer App is a premium e-commerce mobile application designed for a seamless sneaker shopping experience. The application prioritizes clean aesthetics, responsiveness, and persistent user interaction while maintaining real-time connectivity with the cloud backend.
+
+### Core Features
+
+- **Premium UI/UX Design**: Custom design system with Google Fonts (Poppins) to deliver a refined, luxury feel
+- **Real-Time Product Catalog**: Live inventory fetched directly from Supabase, ensuring up-to-date product listings
+- **Hybrid Cart Management System**: 
+  - Local persistence using SharedPreferences for instant UI responsiveness
+  - Cloud synchronization via Supabase to preserve cart data across sessions and logins
+- **Smart Search & Filtering**: Real-time search and filtering for efficient product discovery
+- **Theme Engine**: Support for both Light Mode and a deep, luxury-inspired Dark Mode
+
+### Technology Stack
+
+- **Framework**: Flutter (Material 3)
+- **Backend**: Supabase (PostgreSQL & Authentication)
+- **State Management**: Provider (Cart, Favorites, Theme)
+- **Typography**: Google Fonts (Poppins)
+
+## Admin Management Application Features
+
+The Nexus Store Admin App is a role-restricted Flutter application designed to manage and monitor the e-commerce platform. It serves as the operational backbone of the system, allowing administrators to maintain inventory, categories, and orders with full data integrity.
+
+### Core Features
+
+- **Secure Admin Authentication**: Restricted access with no public registration, ensuring controlled system management
+- **Product Management (CRUD)**: Create, update, and delete products including images, pricing, and category assignment
+- **Category Management**: Structured organization of products for efficient catalog management
+- **Real-Time Synchronization**: Immediate data reflection across admin and customer applications
+- **Dashboard & Order Monitoring**: Real-time visibility into inventory status and customer orders
+
+### Technology Stack
+
+- **Framework**: Flutter (Material 3)
+- **Backend**: Supabase (PostgreSQL & Authentication)
+- **State Management**: Provider (Products, Categories, Admin Actions)
+- **Image Handling**: Secure network-based image storage
+
+## Security & Access Control
+
+- **Row Level Security (RLS)**: Ensures users can only access records associated with their user_id
+- **Admin-Only Operations**: No admin or privileged operations are exposed within the customer application
+- **Role-Based Access**: Authentication and access control are fully managed via Supabase
+- **Data Isolation**: Customer-sensitive data remains isolated and protected
+
+## Database Architecture
+
+### Customer Application
+- **products**: Read-only product catalog
+- **cart_items**: User-specific cart persistence
+- **orders**: Order records (extendable for real-world deployment)
+
+### Admin Application
+- **products**: Full CRUD operations
+- **categories**: Product grouping and classification
+- **orders**: Read-only order monitoring
+
+## Challenges and Solutions
+
+The biggest challenge was implementing a hybrid cart system that provides instant UI responsiveness while maintaining cloud synchronization. I solved this by using SharedPreferences for local persistence and implementing smart sync logic that updates Supabase in the background. Another challenge was ensuring real-time data consistency between admin and customer applications - I addressed this by leveraging Supabase's real-time subscriptions and implementing proper Row Level Security policies.
+
+## Outcome
+
+The Nexus Store platform:
+- Delivers a premium shopping experience with luxury-inspired UI/UX
+- Provides seamless real-time synchronization between admin and customer applications
+- Maintains excellent performance with hybrid cart management
+- Ensures secure, role-based access control throughout the system
+- Supports scalable operations with modular architecture
+
+This project demonstrates my expertise in Flutter development, full-stack architecture design, real-time database integration, and creating production-ready e-commerce solutions with comprehensive security measures and scalable infrastructure.
+
